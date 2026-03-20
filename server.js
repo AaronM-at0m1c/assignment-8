@@ -2,12 +2,115 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const { db, Project, Task, User } = require('./database/setup');
+const { body, validationResult } = require('express-validator');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
+
+// ID validation middleware to prevent injection
+const idValidation = (field) => (req, res, next) => {
+    if (!/^\d+$/.test(req.params[field])) {
+        return res.status(400).json({ error: `${field} must contain digits only` });
+    }
+    next();
+};
+
+// Error handle invaid json body
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON in request body' });
+  }
+  next(err);
+});
+
+// Data validation middleware
+const handleValidationErrors = (req, res, next) => {
+    const errors = validationResult(req);
+  
+    if (!errors.isEmpty()) {
+        const errorMessages =
+    errors.array().map(error => error.msg);
+    
+        return res.status(400).json({
+            error: 'Validation failed',
+            messages: errorMessages
+        });
+    }
+  
+    // Set default value for completed if not provided
+    if (req.body.completed === undefined) {
+        req.body.completed = false;
+    }
+  
+    next();
+};
+
+// Validation rules
+const projectValidation = [
+  body()
+  .custom((body) => {
+    if (Object.keys(body).length > 4) {
+    }
+    return true;
+  })
+    .withMessage('Request must only contain the following fields: name, description, status, due-date.'),
+  body('name')
+    .isLength({ min: 1 })
+    .withMessage('Project name cannot be null'),
+  
+  body('description')
+    .isLength({ min: 1 })
+    .withMessage('Description cannot be null'),
+  
+  body('status')
+    .isLength({ min: 1 })
+    .withMessage('Status cannot be null'),
+
+  body('due-date')
+    .matches(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/)
+    .withMessage('Due-date must be in YYYY-MM-DD format, e.g. 2024-12-31'),
+
+  body('userId')
+    .isInt({ min: 1 })
+    .withMessage('UserId must be a positive number'),
+];
+
+const taskValidation = [
+  body()
+  .custom((body) => {
+    if (Object.keys(body).length > 4) {
+    }
+    return true;
+  })
+    .withMessage('Request must only contain the following fields: name, description, status, due-date.'),
+  body('title')
+    .isLength({ min: 1 })
+    .withMessage('Title cannot be null'),
+  
+  body('description')
+    .isLength({ min: 1 })
+    .withMessage('Description cannot be null'),
+  
+  body('completed')
+    .isBoolean()
+    .withMessage('Completed status must be either true or false'),
+
+  body('priority')
+    .isLength({ min: 1 })
+    .withMessage('Priority cannot be null'),
+
+  body('due-date')
+    .matches(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/)
+    .withMessage('Due-date must be in YYYY-MM-DD format, e.g. 2024-12-31'),
+
+  body('projectId')
+    .isInt({ min: 1 })
+    .withMessage('Project ID must be a positive number'),
+];
+
 
 // Session
 app.use(session({
@@ -61,7 +164,7 @@ app.get('/api/projects', requireAuth, async (req, res) => {
 });
 
 // GET /api/projects/:id - Get project by ID
-app.get('/api/projects/:id', async (req, res) => {
+app.get('/api/projects/:id', idValidation('id'), async (req, res) => {
     try {
         const project = await Project.findByPk(req.params.id);
         
@@ -77,15 +180,17 @@ app.get('/api/projects/:id', async (req, res) => {
 });
 
 // POST /api/projects - Create new project
-app.post('/api/projects', async (req, res) => {
+app.post('/api/projects', projectValidation, handleValidationErrors, async (req, res) => {
     try {
-        const { name, description, status, dueDate } = req.body;
+        const { name, description, status, userId } = req.body;
+        const dueDate = req.body['due-date'];
         
         const newProject = await Project.create({
             name,
             description,
             status,
-            dueDate
+            dueDate,
+            userId
         });
         
         res.status(201).json(newProject);
@@ -96,12 +201,13 @@ app.post('/api/projects', async (req, res) => {
 });
 
 // PUT /api/projects/:id - Update existing project
-app.put('/api/projects/:id', async (req, res) => {
+app.put('/api/projects/:id', idValidation('id'), projectValidation, handleValidationErrors, async (req, res) => {
     try {
-        const { name, description, status, dueDate } = req.body;
+        const { name, description, status, userId } = req.body;
+        const dueDate = req.body['due-date'];
         
         const [updatedRowsCount] = await Project.update(
-            { name, description, status, dueDate },
+            { name, description, status, dueDate, userId },
             { where: { id: req.params.id } }
         );
         
@@ -118,7 +224,7 @@ app.put('/api/projects/:id', async (req, res) => {
 });
 
 // DELETE /api/projects/:id - Delete project
-app.delete('/api/projects/:id', async (req, res) => {
+app.delete('/api/projects/:id', idValidation('id'), async (req, res) => {
     try {
         const deletedRowsCount = await Project.destroy({
             where: { id: req.params.id }
@@ -149,7 +255,7 @@ app.get('/api/tasks', async (req, res) => {
 });
 
 // GET /api/tasks/:id - Get task by ID
-app.get('/api/tasks/:id', async (req, res) => {
+app.get('/api/tasks/:id', idValidation('id'), async (req, res) => {
     try {
         const task = await Task.findByPk(req.params.id);
         
@@ -165,9 +271,10 @@ app.get('/api/tasks/:id', async (req, res) => {
 });
 
 // POST /api/tasks - Create new task
-app.post('/api/tasks', async (req, res) => {
+app.post('/api/tasks', taskValidation, handleValidationErrors, async (req, res) => {
     try {
-        const { title, description, completed, priority, dueDate, projectId } = req.body;
+        const { title, description, completed, priority, projectId } = req.body;
+        const dueDate = req.body['due-date'];
         
         const newTask = await Task.create({
             title,
@@ -186,9 +293,10 @@ app.post('/api/tasks', async (req, res) => {
 });
 
 // PUT /api/tasks/:id - Update existing task
-app.put('/api/tasks/:id', async (req, res) => {
+app.put('/api/tasks/:id', idValidation('id'), taskValidation, handleValidationErrors, async (req, res) => {
     try {
-        const { title, description, completed, priority, dueDate, projectId } = req.body;
+        const { title, description, completed, priority, projectId } = req.body;
+        const dueDate = req.body['due-date'];
         
         const [updatedRowsCount] = await Task.update(
             { title, description, completed, priority, dueDate, projectId },
@@ -208,7 +316,7 @@ app.put('/api/tasks/:id', async (req, res) => {
 });
 
 // DELETE /api/tasks/:id - Delete task
-app.delete('/api/tasks/:id', async (req, res) => {
+app.delete('/api/tasks/:id', idValidation('id'), async (req, res) => {
     try {
         const deletedRowsCount = await Task.destroy({
         where: { id: req.params.id }
