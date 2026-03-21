@@ -56,7 +56,7 @@ const projectValidation = [
     }
     return true;
   })
-    .withMessage('Request must only contain the following fields: name, description, status, due-date.'),
+    .withMessage('Request must only contain the following fields: name, description, status, dueDate.'),
   body('name')
     .isLength({ min: 1 })
     .withMessage('Project name cannot be null'),
@@ -69,9 +69,9 @@ const projectValidation = [
     .isLength({ min: 1 })
     .withMessage('Status cannot be null'),
 
-  body('due-date')
+  body('dueDate')
     .matches(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/)
-    .withMessage('Due-date must be in YYYY-MM-DD format, e.g. 2024-12-31'),
+    .withMessage('DueDate must be in YYYY-MM-DD format, e.g. 2024-12-31'),
 
   body('userId')
     .isInt({ min: 1 })
@@ -85,7 +85,7 @@ const taskValidation = [
     }
     return true;
   })
-    .withMessage('Request must only contain the following fields: name, description, status, due-date.'),
+    .withMessage('Request must only contain the following fields: name, description, status, dueDate.'),
   body('title')
     .isLength({ min: 1 })
     .withMessage('Title cannot be null'),
@@ -102,9 +102,9 @@ const taskValidation = [
     .isLength({ min: 1 })
     .withMessage('Priority cannot be null'),
 
-  body('due-date')
+  body('dueDate')
     .matches(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/)
-    .withMessage('Due-date must be in YYYY-MM-DD format, e.g. 2024-12-31'),
+    .withMessage('DueDate must be in YYYY-MM-DD format, e.g. 2024-12-31'),
 
   body('projectId')
     .isInt({ min: 1 })
@@ -183,7 +183,7 @@ app.get('/api/projects/:id', idValidation('id'), async (req, res) => {
 app.post('/api/projects', projectValidation, handleValidationErrors, async (req, res) => {
     try {
         const { name, description, status, userId } = req.body;
-        const dueDate = req.body['due-date'];
+        const dueDate = req.body['dueDate'];
         
         const newProject = await Project.create({
             name,
@@ -204,7 +204,7 @@ app.post('/api/projects', projectValidation, handleValidationErrors, async (req,
 app.put('/api/projects/:id', idValidation('id'), projectValidation, handleValidationErrors, async (req, res) => {
     try {
         const { name, description, status, userId } = req.body;
-        const dueDate = req.body['due-date'];
+        const dueDate = req.body['dueDate'];
         
         const [updatedRowsCount] = await Project.update(
             { name, description, status, dueDate, userId },
@@ -274,7 +274,7 @@ app.get('/api/tasks/:id', idValidation('id'), async (req, res) => {
 app.post('/api/tasks', taskValidation, handleValidationErrors, async (req, res) => {
     try {
         const { title, description, completed, priority, projectId } = req.body;
-        const dueDate = req.body['due-date'];
+        const dueDate = req.body['dueDate'];
         
         const newTask = await Task.create({
             title,
@@ -296,7 +296,7 @@ app.post('/api/tasks', taskValidation, handleValidationErrors, async (req, res) 
 app.put('/api/tasks/:id', idValidation('id'), taskValidation, handleValidationErrors, async (req, res) => {
     try {
         const { title, description, completed, priority, projectId } = req.body;
-        const dueDate = req.body['due-date'];
+        const dueDate = req.body['dueDate'];
         
         const [updatedRowsCount] = await Task.update(
             { title, description, completed, priority, dueDate, projectId },
